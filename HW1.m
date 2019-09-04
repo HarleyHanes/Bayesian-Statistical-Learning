@@ -5,7 +5,7 @@
 clear; close all;
 %Data Input and Basis Function Declaration
 x_data=[0; 1; 2; 3; 4];
-y_data=[1.09; .05; -.94; -3.57; -7.02];
+y_data=[1.09; .5; -.94; -3.57; -7.02];
 % Section 1
 rho1 = @(x) 0*x+1;
 % Section 2
@@ -43,3 +43,17 @@ legend(labels);
 
 xlabel('x')
 ylabel('y')
+
+%% lsqnonlin and fminsearch practice
+clear;
+x=[0; 1; 2; 3; 4];
+y_data=[1.09; .5; -.94; -3.57; -7.02];
+f = @(Coef)Coef(1) + Coef(2)*x +Coef(3)*x.^2 +Coef(4)*x.^3-y_data;
+init=[1 0 -.6 .1];
+
+lsqnonlin(f,init)
+
+lsq= @(Coef)sum((f(Coef)-y_data).^2);
+fminsearch(lsq,init)
+
+
