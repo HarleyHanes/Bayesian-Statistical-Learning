@@ -1,59 +1,118 @@
+%===================================================================
+% Harley Hanes
+% Functions for Solving Linear Systems                      
+% Bayesian Statistical Learning                           
 %-------------------------------------------------------------------
-% Harley Hanes                                               8/29/19
-% Bayesian Statistical Learning                           Homework 1
+% This is the main file for the code set to solve linear systems using 
+% linear and nonlinear solvers. Code is broken into following
+% sections.
+% 1) Master control- Solver, data, and basis function selection
+% 2) Data and basis function entry
+% 3) Liner solver
+% 4) Lsqnonlin
+% 5) fminsearch
+% 6) Plotting
 %-------------------------------------------------------------------
-clear; close all;
-%Data Input and Basis Function Declaration
-x_data=[0; 1; 2; 3; 4];
-y_data=[1.09; .5; -.94; -3.57; -7.02];
-% Section 1
-rho1 = @(x) 0*x+1;
-% Section 2
-rho2 = @(x)[0*x+1 x];
-% Section 3
-rho3 = @(x)[0*x+1 x x.^2];
-% Section 4
-rho4 = @(x)[0*x+1 x x.^2 x.^3];
-BasisFunctions={rho1 rho2 rho3 rho4};
+% Version Notes
+% 1)Haven't figured out how to adjust input vector lengths based on # of
+%   basis functions. Is creating issue for fminsearch
+% 2)fminsearch seems to need a decrease in tolerance to work for the class
+%   data
+% 3)Plotting currently only works for Linear Solve and legend doesn't work
+%===================================================================
+clear; close all;clc;
+%% Master Control
+DataType='Class Data'; %Options: 'Class Data', 'Normal Scatter
+                          %         'Straight Line'
+BasisFunc='3rd Order Poly'; %Opions '0, 1st, 2nd, 3rd Order Poly'
+Solver='all'; %Options: Linear, lsqnonlin, fminsearch, all
+PlotBool='yes';
 
-% Coeffecient Calculation
-Beta=zeros(4);
-for i=1:4
-    rho=BasisFunctions{i};
-    X=rho(x_data);
-    Beta(1:i,i)=(X'*X)\(X'*y_data);
+
+%% Data and basis function entry
+switch DataType
+    case 'Class Data'
+        xData=[0; 1; 2; 3; 4];
+        yData=[1.09; .5; -.94; -3.57; -7.02];
+    case 'Normal Scatter'
+        xData=(1:.1:10)';
+        yData=(randn(1,length(xData))*.1)';
+    case 'Straight Line'
+        xData=(1:.1:10)';
+        yData=ones(1,length(xData))';
+    otherwise 
+        fprintf('Error!! DataType not recognized')
+        keyboard
 end
 
-%Plotting
-plot(x_data,y_data,'r*','MarkerSize',10)
-hold on 
-
-f = @(Coef, x)Coef(1) + Coef(2)*x +Coef(3)*x.^2 +Coef(4)*x.^3;
-x=-1:.01:5;
-for i=1:4
-    line=f(Beta(:,i),x);
-    plot(x,line,'LineWidth',1.5)
+switch BasisFunc
+    case '0 Order Poly'
+        rho=@(x) x.^0;
+        fModel = @(Coef)Coef(1);
+    case '1st Order Poly'
+        rho=@(x)[x.^0 x.^1];
+        fModel = @(Coef)Coef(1) + Coef(2)*xData;
+    case '2nd Order Poly'
+        rho=@(x)[x.^0 x.^1 x.^2];
+        fModel = @(Coef)Coef(1) + Coef(2)*xData +Coef(3)*xData.^2;
+    case '3rd Order Poly'
+        rho=@(x)[x.^0 x.^1 x.^2 x.^3];
+        fModel = @(Coef)Coef(1) + Coef(2)*xData +Coef(3)*xData.^2 +Coef(4)*xData.^3;
+     otherwise
+        fprintf('Error!! BasisFunc not recognized')
+        keyboard
 end
-labels{1}='Data Points';
-labels{2}=sprintf('\\rho (x)= %.2f',Beta(1,1));
-labels{3}=sprintf('\\rho (x)= %.2f + %.2fx',Beta(1:2,2));
-labels{4}=sprintf('\\rho (x)= %.2f + %.2fx + %.2fx^2', Beta(1:3,3));
-labels{5}=sprintf('\\rho (x)= %.2f + %.2fx + %.2fx^2 + %.2fx^4', Beta(1:4,4));
-legend(labels);
+%% Linear Solver
+X=rho(xData);
+LinBeta=((X'*X)\(X'*yData))';
 
-xlabel('x')
-ylabel('y')
+%% Lsqnonlin
 
-%% lsqnonlin and fminsearch practice
-clear;
-x=[0; 1; 2; 3; 4];
-y_data=[1.09; .5; -.94; -3.57; -7.02];
-f = @(Coef)Coef(1) + Coef(2)*x +Coef(3)*x.^2 +Coef(4)*x.^3-y_data;
-init=[1 0 -.6 .1];
+lsqfunc= @(Coef)fModel(Coef)-yData;
+init=zeros(1,4);
+lsqBeta=lsqnonlin(lsqfunc,init);
 
-lsqnonlin(f,init)
+%% fminsearch
+fR=@(Coef)fModel(Coef)-yData;
+fminfunc= @(Coef)fR(Coef)'*fR(Coef);
+options = optimset('TolFun',1e-8,'TolX',1e-8);
 
-lsq= @(Coef)sum((f(Coef)-y_data).^2);
-fminsearch(lsq,init)
+init=zeros(1,4);
+fminBeta=fminsearch(fminfunc,init,options);
+%% Display and Plotting
+switch Solver
+    case 'all'
+        DispLinBeta=sprintf('%.2f,',LinBeta);
+        DisplsqBeta=sprintf('%.2f,',lsqBeta);
+        DispfminBeta=sprintf('%.2f,',fminBeta);
+        DispMessage=sprintf('Model Coefficients for each Solver\nLinear: %s\nlsqnonlin: %s\nfminsearch: %s',DispLinBeta,DisplsqBeta,DispfminBeta);
+        disp(DispMessage)
+    otherwise
+        fprintf('Error!! Solver not recognized')
+        keyboard
+end
+if strcmpi(PlotBool,'yes') || strcmpi(PlotBool,'no')
+    tPlot=linspace(min(xData)-(min(xData)+max(xData))/10,...
+        max(xData)+(min(xData)+max(xData))/10);
+    yPlot=zeros(1,length(tPlot));
+    if size(LinBeta)== size(rho(xData(1)))
+        Beta=LinBeta';
+    else
+        Beta=LinBeta;
+    end
+    for i=1:length(tPlot)
+        yPlot(i)=rho(tPlot(i))*Beta;
+    end
+    plot(xData,yData,'r*','MarkerSize',10)
+    hold on 
+    plot(tPlot,yPlot)
+    PlotLegend={'Data',sprintf('%s\nBeta=%.2f',BasisFunc,Beta')};
+    legend(PlotLegend)
+    xlabel('x')
+    ylabel('y')
+    PlotTitle=sprintf('%s Function Fit for %s',BasisFunc,DataType);
+    title(PlotTitle)
+end
+
 
 
