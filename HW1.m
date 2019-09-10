@@ -14,18 +14,18 @@
 % 6) Plotting
 %-------------------------------------------------------------------
 % Version Notes
-% 1)fminsearch is not reaching its optimal value for Runge function (giving
-% a sum of squared residuals of approximately .02
-% 2)ODE function isnt minimizing because each solve iteration has different
-% numbers of data points so I can't line up data
+% 1)All Solvers, DataTypes, and BasisFunctions working and plotting
+% correctly
 %===================================================================
 clear; close all;clc;
 %% Master Control
 DataType='Harmonic ODE'; %Options: 'Class Data', 'Normal Scatter
-                          %         'Straight Line', 'Runge Function'
-BasisFunc='Harmonic ODE'; %Opions '0, 1st, 2nd, 3rd Order Poly'
-                            %        'Mixed Exponential'
-                            %        'Self Enter
+                          %         'Straight Line', 'Runge
+                          %         Function','First Order ODE','Harmonic
+                          %         ODE'
+BasisFunc='3rd Order Poly'; %Opions '0, 1st, 2nd, 3rd Order Poly'
+                            %        'Mixed Exponential','First Order ODE'
+                            %        'Harmonic ODE'
 Solver='fminsearch'; %Options: Linear, lsqnonlin, fminsearch, all
 PlotBool='yes';
 
@@ -53,12 +53,21 @@ switch DataType
         TrueFunc=@(x) a./(b+c.*x.^2);
         xData=linspace(xmin,xmax,NumPoints)';
         yData=TrueFunc(xData);
-    case 'Harmonic ODE'
+    case 'First Order ODE'
+        xmin=0;
+        xmax=10;
         NumPoints=20;
-        tspan=[0,10];
-        Coef=[0 1/2 1 2];
+        xData=linspace(xmin,xmax,NumPoints)';
+        Coef=[1 1];
         numCoef=length(Coef);
-        [xData,yData]=HarmonicODE(Coef,tspan,NumPoints);
+        yData=FirstOrderODE(Coef,xData);
+    case 'Harmonic ODE'
+        xmin=0;
+        xmax=10;
+        NumPoints=30;
+        xData=linspace(xmin,xmax,NumPoints)';
+        Coef=[5 10 1 1];
+        yData=HarmonicODE(Coef,xData);
     otherwise 
         fprintf('Error!! DataType not recognized')
         keyboard
@@ -84,9 +93,12 @@ switch BasisFunc
     case 'Mixed Exponential'
         fModel = @(Coef,x)Coef(1) + Coef(2) * exp(Coef(3).*x + Coef(4)*x.^2);
         numCoef=4;
+    case 'First Order ODE'
+        fModel=@(Coef,tspan)FirstOrderODE(Coef,tspan);
+        numCoef=2;
     case 'Harmonic ODE'
-        tspan=[0,10];
-        fModel=@(Coef)HarmonicODE(Coef,tspan,NumPoints);
+        fModel=@(Coef,tspan)HarmonicODE(Coef,tspan);
+        numCoef=4;
     case 'Self Enter'
     otherwise
         fprintf('Error!! BasisFunc not recognized')
@@ -106,11 +118,7 @@ end
 
 %% Lsqnonlin
 if strcmpi(Solver,'Lsqnonlin') || strcmpi(Solver,'All')
-    if strcmpi(BasisFunc,'Harmonic ODE')
-        lsqfunc= @(Coef)fModel(Coef)-yData;
-    else
-        lsqfunc= @(Coef)fModel(Coef,xData)-yData;
-    end
+    lsqfunc= @(Coef)fModel(Coef,xData)-yData;
     init=rand(1,numCoef);
     lsqBeta=lsqnonlin(lsqfunc,init);
     if strcmpi(Solver,'Lsqnonlin')
@@ -119,11 +127,7 @@ if strcmpi(Solver,'Lsqnonlin') || strcmpi(Solver,'All')
 end
 %% fminsearch
 if strcmpi(Solver,'fminsearch') || strcmpi(Solver,'All')
-    if strcmpi(BasisFunc,'Harmonic ODE')
-        fR= @(Coef)fModel(Coef)-yData;
-    else
-        fR=@(Coef)fModel(Coef,xData)-yData;
-    end
+    fR=@(Coef)fModel(Coef,xData)-yData;
     fminfunc= @(Coef)fR(Coef)'*fR(Coef);
     options = optimset('TolFun',1e-4,'TolX',1e-4);
     init=rand(1,numCoef);
@@ -160,13 +164,9 @@ if strcmpi(PlotBool,'yes') || strcmpi(PlotBool,'no')
     else
         
     end
-    if strcmpi(BasisFunc,'Harmonic ODE')
-        [xPlot,yPlot]=HarmonicODE(Beta,tspan);
-    else
-        xPlot=linspace(min(xData)-(min(xData)+max(xData))/10,...
-        max(xData)+(min(xData)+max(xData))/10);
-        yPlot=fModel(Beta,xPlot);
-    end
+
+    xPlot=linspace(min(xData),max(xData));
+    yPlot=fModel(Beta,xPlot);
     plot(xData,yData,'r*','MarkerSize',10)
     hold on 
     plot(xPlot,yPlot)
@@ -181,8 +181,10 @@ if strcmpi(PlotBool,'yes') || strcmpi(PlotBool,'no')
             LegendFunc=sprintf('y=%.2f%+.2fx%+.2fx^2%+.2fx^3',Beta);
         case 'Mixed Exponential'
             LegendFunc=sprintf('y=%.2f%+.2fe^{%.2fx%+.2fx^2}',Beta);
+        case 'First Order ODE'
+            LegendFunc=sprintf('y_0=%.2f, y''=%.2fy',Beta);
         case 'Harmonic ODE'
-            LegendFunc=sprintf('y''''%+.2fy''%+.2fy=0',Beta(3),Beta(4));
+            LegendFunc=sprintf('y_0=%.2f,y_0''=%.2f\ny''''%+.2fy''%+.2fy=0',Beta);
         case 'Self Enter'
         otherwise
             fprintf('Error!! BasisFunc not recognized')
@@ -195,17 +197,20 @@ if strcmpi(PlotBool,'yes') || strcmpi(PlotBool,'no')
     title(PlotTitle)
     
 end
-%%
-function [x,y]=HarmonicODE(Coef,tspan,varargin)
+%% ODE functions
+function Position=HarmonicODE(Coef,tspan)
     y0=[Coef(1),Coef(2)];
     dydt = @(t,y)[y(2); -Coef(3).*y(2) - Coef(4).*y(1)];
     [x,y]=ode45(dydt,tspan,y0);
-    if size(varargin)~=0
-       NumPoints=varargin{1};
-       index=floor((1:NumPoints)*length(x)/20); 
-       x=x(index);
-       y=y(index,1);
-    end
+    Position=y(:,1);
+    x;
+end
+
+function Position=FirstOrderODE(Coef,tspan,varargin)
+    y0=Coef(1);
+    dydt=@(t,y)Coef(2)*y;
+    [x,Position]=ode45(dydt,tspan,y0);
+     x;
 end
     
 
