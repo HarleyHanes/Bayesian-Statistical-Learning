@@ -25,7 +25,8 @@ DataType='Harmonic ODE'; %Options: 'Class Data', 'Normal Scatter
                           %         ODE'
 BasisFunc='3rd Order Poly'; %Opions '0, 1st, 2nd, 3rd Order Poly'
                             %        'Mixed Exponential','First Order ODE'
-                            %        'Harmonic ODE'
+                            %        'Harmonic ODE','Define Own'
+    if strcmpi(BasisFunc,'Define Own')
 Solver='fminsearch'; %Options: Linear, lsqnonlin, fminsearch, all
 PlotBool='yes';
 
@@ -68,6 +69,8 @@ switch DataType
         xData=linspace(xmin,xmax,NumPoints)';
         Coef=[5 10 1 1];
         yData=HarmonicODE(Coef,xData);
+    case 'Define Own'
+        
     otherwise 
         fprintf('Error!! DataType not recognized')
         keyboard
