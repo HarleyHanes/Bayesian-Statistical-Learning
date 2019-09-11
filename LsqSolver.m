@@ -22,11 +22,20 @@ clear; close all;clc;
 DataType='Harmonic ODE'; %Options: 'Class Data', 'Normal Scatter
                           %         'Straight Line', 'Runge
                           %         Function','First Order ODE','Harmonic
-                          %         ODE'
+                          %         ODE','Load Data'
+   if strcmpi(DataType,'Load Data')
+       filename='data.csv';%Include full path name if not in path
+       DataOrient='column';    %whether data vectors are column or row vectors
+       xPoint=1;           %which row/ column xData is in
+       yPoint=2;           %which row/ column yData is in
+   end
 BasisFunc='3rd Order Poly'; %Opions '0, 1st, 2nd, 3rd Order Poly'
                             %        'Mixed Exponential','First Order ODE'
                             %        'Harmonic ODE','Define Own'
     if strcmpi(BasisFunc,'Define Own')
+        fDefine=@(Coef,x) Coef(1).*x;
+        numCoef=1;
+    end
 Solver='fminsearch'; %Options: Linear, lsqnonlin, fminsearch, all
 PlotBool='yes';
 
@@ -59,18 +68,29 @@ switch DataType
         xmax=10;
         NumPoints=20;
         xData=linspace(xmin,xmax,NumPoints)';
-        Coef=[1 1];
-        numCoef=length(Coef);
-        yData=FirstOrderODE(Coef,xData);
+        CoefData=[1 1];
+        yData=FirstOrderODE(CoefData,xData);
     case 'Harmonic ODE'
         xmin=0;
         xmax=10;
         NumPoints=30;
         xData=linspace(xmin,xmax,NumPoints)';
-        Coef=[5 10 1 1];
-        yData=HarmonicODE(Coef,xData);
-    case 'Define Own'
-        
+        CoefData=[5 10 1 1];
+        yData=HarmonicODE(CoefData,xData);
+    case 'Load Data'
+        DataTemp=load(filename);
+        switch DataOrient
+            case 'column'
+                xData=DataTemp(:,xPoint);
+                yData=DataTemp(:,yPoint);
+            case 'row'
+                xData=DataTemp(xPoint,:);
+                yData=DataTemp(yPoint,:);
+            otherwise
+                fprintf(['Error!! Data orientation not recognized. Enter as'...
+                    'row or column'])
+                keyboard
+        end
     otherwise 
         fprintf('Error!! DataType not recognized')
         keyboard
@@ -103,6 +123,7 @@ switch BasisFunc
         fModel=@(Coef,tspan)HarmonicODE(Coef,tspan);
         numCoef=4;
     case 'Self Enter'
+        fModel=@(Coef,x)fDefine(Coef,x);
     otherwise
         fprintf('Error!! BasisFunc not recognized')
         keyboard
