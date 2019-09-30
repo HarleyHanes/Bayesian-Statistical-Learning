@@ -55,6 +55,7 @@ Basis=ConstructBasis(Basis);
 %% Solver
 Results=LSQsolve(Data,Basis,Solver);
 
+%% Residual Analysis
 
 %% Display Results
 switch Solver
