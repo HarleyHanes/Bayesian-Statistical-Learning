@@ -1,15 +1,25 @@
 %%Solving non-square systems
 %-Harley Hanes, Fall 2019
-%Testing SVD, Morse-Penrose Psuedoinverse (MPP), and Ridge/ Tickinoff
-%methods for solving nonsquare systems. 
+%Testing SVD, Morse-Penrose Psuedoinverse (MPP), Ridge/ Tickinoff and
+%    matrix scaling methods for solving nonsquare systems. 
 %% Results Notes
-%Worried There may be an issue with my functions because MPP and Ridge
-% are failing for
-% full rank matrices
-%MPP has huge residuals for row singular matrices if there are more
-% columns and huge residuls for column singular matrices if there are more
-% rows
-%SVD is working where A\b works
+%Overall notes- MPP sometimes beats SVD but SVD is never horribly off like
+%MPP, Ridge is never much better than MPP so I think there may be an issue
+%there
+%Col > Row
+    %Nonsingular- All tests performing well except ridge
+    %colSingular- All tests performing well except ridge which is getting
+                    %residual norms of about 10^(-5)
+    %rowSingular- All tests performing as well as A\b except for xMPP which
+    %               has 10x the residual of others (O(.1) vs O(1))
+    %row&col Singular- All tests performing as well as A\b except MPP which
+    %                  has residuals O(10^17)
+% Row < Col
+    %Nonsingular- All tests performing as well as A\b
+    %colSingular- MPP failing with O(10^15)
+    %rowSingular- All tests performing as well as A\b 
+    %row&col Singular- MPP sometimes fails, sometimes succeeds
+
 clear;clc;
 %% Generating A
 mRow=3;
@@ -100,14 +110,36 @@ disp('Assessing Numerical Accuracies for Ax=b')
 ASVD=SVDinv(A);
 xSVD=ASVD*b;
 %MPP Solve
-MPP=A'*A;
-AMPP=SVDinv(MPP);
-xMPP=AMPP*A'*b;
+if mRow >= nCol
+    MPP=A'*A;
+    MPPinv=SVDinv(MPP);
+    xMPP=MPPinv*A'*b;
+else 
+    MPP=A*A';
+    MPPinv=SVDinv(MPP);
+    xMPP=A'*MPPinv*b;
+end
 %Ridge/Tickinoff
-xRidge=ridge(b,A,10^(-6));
+%xRidge=ridge(b,A,10^(-6));
+lambda=10^(-6);
+if mRow < nCol
+    Atil=[A; zeros(nCol-mRow,nCol)];
+    Atil=Atil + lambda*eye(nCol);
+    %Atil=[A; lambda*eye(nCol-mRow,nCol)];
+    btil= [b; zeros(nCol-mRow,1)];
+    ARidge=Atil'*Atil;
+    bRidge=Atil'*btil;
+    ARidgeInv=SVDinv(ARidge);
+    xRidge=ARidgeInv*bRidge;
+else
+    xRidge=zeros(length(xMPP),1);
+end
+%--Ridge not equaling MPP if lambda=0
+%Ridge Scale
+xScaleSolve=ScaleSolve(A,b,2);
 %Results Comparison
-x=[A\b xSVD xMPP xRidge];
-disp('x solutions found under A\b xSVD xMPP xRidge')
+x=[A\b xSVD xMPP xRidge xScaleSolve];
+disp('x solutions found under A\b xSVD xMPP xRidge xRidgeScaled')
 disp(x)
 for i=1:4
     xerr(i)=norm(b-A*x(:,i));
@@ -126,3 +158,4 @@ function Ainv=SVDinv(A)
     end
     Ainv=V*Dinv*U';
 end
+
